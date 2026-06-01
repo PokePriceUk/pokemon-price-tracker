@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PokePrice — Card Price Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:          #F0EEEA;
+      --surface:     #FFFFFF;
+      --surface2:    #FAF8F6;
+      --border:      #E2DDD8;
+      --red:         #CC0000;
+      --red-dark:    #A80000;
+      --red-light:   #FFF0F0;
+      --yellow:      #FFCB05;
+      --yellow-dark: #D9AB00;
+      --yellow-light:#FFFBEA;
+      --text:        #1A1A1A;
+      --muted:       #8A847C;
+      --green:       #1A7A35;
+      --green-light: #EDFBF2;
+      --radius:      12px;
+      --shadow:      0 2px 10px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-lg:   0 8px 28px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: var(--red);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+      /* subtle pokeball circle watermark */
+      overflow: hidden;
+    }
+    header::after {
+      content: '';
+      position: absolute;
+      right: -60px; top: -60px;
+      width: 180px; height: 180px;
+      border-radius: 50%;
+      border: 28px solid rgba(255,255,255,0.07);
+      pointer-events: none;
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      height: 66px;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: relative;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 900;
+      font-size: 1.35rem;
+      letter-spacing: -0.3px;
+      text-decoration: none;
+      color: white;
+    }
+    .logo-ball {
+      width: 30px; height: 30px;
+      background: conic-gradient(white 50%, #880000 50%);
+      border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,0.55);
+      position: relative;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.15) inset;
+    }
+    .logo-ball::after {
+      content: '';
+      position: absolute;
+      left: -2px; right: -2px;
+      height: 2.5px;
+      background: rgba(255,255,255,0.55);
+      top: calc(50% - 1.25px);
+    }
+    .badge {
+      background: var(--yellow);
+      color: #1A1A1A;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 99px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+    nav {
+      margin-left: auto;
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .nav-btn {
+      background: transparent;
+      border: 2px solid rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.8);
+      padding: 6px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .nav-btn:hover { border-color: white; color: white; }
+    .nav-btn.active { background: var(--yellow); border-color: var(--yellow); color: #1A1A1A; }
+
+    /* ── Main ───────────────────────────────────────────────── */
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem;
+    }
+
+    /* ── Hero / Search ──────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .hero h1 {
+      font-size: 2.6rem;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      margin-bottom: 0.4rem;
+      line-height: 1.1;
+      color: var(--text);
+    }
+    .hero h1 span { color: var(--red); }
+    .hero p {
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .search-wrap {
+      display: flex;
+      gap: 0.75rem;
+      max-width: 620px;
+      margin: 0 auto;
+    }
+    .search-input-wrap { flex: 1; position: relative; }
+    .search-icon {
+      position: absolute;
+      left: 14px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    #search {
+      width: 100%;
+      background: white;
+      border: 2px solid var(--border);
+      color: var(--text);
+      padding: 13px 16px 13px 42px;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-family: inherit;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      box-shadow: var(--shadow);
+    }
+    #search:focus {
+      border-color: var(--red);
+      box-shadow: 0 0 0 3px rgba(204,0,0,0.12);
+    }
+    #search::placeholder { color: var(--muted); font-weight: 600; }
+
+    .search-btn {
+      background: var(--yellow);
+      border: 2px solid var(--yellow-dark);
+      color: #1A1A1A;
+      padding: 13px 26px;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 900;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+    .search-btn:hover { background: var(--yellow-dark); }
+    .search-btn:active { transform: scale(0.97); }
+
+    /* ── Suggestion chips ───────────────────────────────────── */
+    .suggestions {
+      max-width: 620px;
+      margin: 0.75rem auto 0;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .suggestion-chip {
+      background: white;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      padding: 4px 14px;
+      border-radius: 99px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .suggestion-chip:hover {
+      border-color: var(--red);
+      color: var(--red);
+      background: var(--red-light);
+    }
+
+    /* ── Filters ────────────────────────────────────────────── */
+    .filters {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .filter-label { color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+    .filter-select {
+      background: white;
+      border: 2px solid var(--border);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      box-shadow: var(--shadow);
+    }
+    .filter-select:focus { border-color: var(--red); }
+    .result-count {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    /* ── Results grid ───────────────────────────────────────── */
+    #results {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 1rem;
+    }
+
+    .listing-card {
+      background: white;
+      border: 1.5px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.1rem 1.1rem 1rem;
+      display: flex;
+      flex-direction: row;
+      gap: 1rem;
+      align-items: stretch;
+      transition: border-left-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      box-shadow: var(--shadow);
+    }
+    .listing-card:hover {
+      border-left-color: var(--red);
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* ── Card image placeholder ─────────────────────────────── */
+    /* swap src to a real URL when eBay photos are connected */
+    .card-thumb {
+      flex-shrink: 0;
+      width: 70px;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 2px dashed var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+    .card-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 6px;
+    }
+    .card-thumb-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      width: 100%;
+      height: 100%;
+      padding: 6px 4px;
+    }
+    .card-thumb-emoji { font-size: 1.7rem; line-height: 1; }
+    .card-thumb-label {
+      font-size: 0.52rem;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .card-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    /* ── Listing top row ────────────────────────────────────── */
+    .listing-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .card-name {
+      font-weight: 900;
+      font-size: 0.97rem;
+      line-height: 1.25;
+      flex: 1;
+      margin-right: 0.5rem;
+      color: var(--text);
+    }
+    .card-set {
+      font-size: 0.73rem;
+      color: var(--muted);
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    /* ── Deal badge ─────────────────────────────────────────── */
+    .deal-badge {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 99px;
+      letter-spacing: 0.2px;
+      font-family: inherit;
+    }
+    .deal-great { background: var(--green-light); color: var(--green);   border: 1.5px solid #9DDDB5; }
+    .deal-good  { background: var(--yellow-light); color: #7A5C00;       border: 1.5px solid #F4D455; }
+    .deal-fair  { background: #F0EEEA;             color: var(--muted);  border: 1.5px solid var(--border); }
+    .deal-poor  { background: var(--red-light);    color: var(--red);    border: 1.5px solid #F4B0B0; }
+
+    /* ── Meta grid ──────────────────────────────────────────── */
+    .listing-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+    }
+    .meta-item { display: flex; flex-direction: column; gap: 1px; }
+    .meta-label {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 800;
+    }
+    .meta-value { font-size: 0.88rem; font-weight: 800; }
+
+    .marketplace-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+    .mp-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .mp-ebay    { background: #e53238; }
+    .mp-tcg     { background: #3b5bdb; }
+    .mp-cardmkt { background: #0aaa9c; }
+    .mp-merc    { background: #e0287a; }
+
+    /* ── Condition pills ────────────────────────────────────── */
+    .condition-pill {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+    .cond-psa10 { background: #EEF2FF; color: #3730A3; }
+    .cond-psa9  { background: var(--green-light); color: var(--green); }
+    .cond-nm    { background: var(--yellow-light); color: #7A5C00; }
+    .cond-lp    { background: #F0EEEA; color: var(--muted); }
+    .cond-mp    { background: var(--red-light); color: var(--red-dark); }
+
+    /* ── Price row ──────────────────────────────────────────── */
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+    }
+    .price-listing {
+      font-size: 1.45rem;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: var(--red);
+    }
+    .price-market {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 700;
+      text-decoration: line-through;
+    }
+    .price-saving { font-size: 0.8rem; color: var(--green); font-weight: 800; }
+    .price-over   { font-size: 0.8rem; color: var(--red);   font-weight: 800; }
+
+    /* ── Action buttons ─────────────────────────────────────── */
+    .listing-actions { display: flex; gap: 0.5rem; }
+    .btn-view {
+      flex: 1;
+      background: var(--yellow);
+      border: 2px solid var(--yellow-dark);
+      color: #1A1A1A;
+      padding: 7px 8px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 900;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-view:hover { background: var(--yellow-dark); }
+
+    .btn-alert {
+      flex: 1;
+      background: white;
+      border: 2px solid var(--red);
+      color: var(--red);
+      padding: 7px 8px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 900;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .btn-alert:hover  { background: var(--red); color: white; }
+    .btn-alert.active { background: var(--red); color: white; }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+    .empty-state .big { font-size: 3.5rem; margin-bottom: 0.5rem; }
+    .empty-state h3 { font-size: 1.15rem; margin-bottom: 0.3rem; color: var(--text); font-weight: 900; }
+    .empty-state p { font-weight: 600; }
+
+    /* ── Modal ──────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow-lg);
+      animation: pop-in 0.2s ease;
+      border-top: 5px solid var(--red);
+    }
+    @keyframes pop-in {
+      from { transform: scale(0.94); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+    .modal h2 { font-size: 1.25rem; font-weight: 900; margin-bottom: 0.25rem; }
+    .modal .modal-sub { color: var(--muted); font-size: 0.88rem; font-weight: 600; margin-bottom: 1.5rem; }
+    .modal .modal-card { font-weight: 900; color: var(--red); }
+
+    .form-group { margin-bottom: 1.25rem; }
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 800;
+      margin-bottom: 0.4rem;
+    }
+    .form-input {
+      width: 100%;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      color: var(--text);
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      font-family: inherit;
+      font-weight: 700;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-input:focus {
+      border-color: var(--red);
+      box-shadow: 0 0 0 3px rgba(204,0,0,0.1);
+    }
+
+    .modal-actions { display: flex; gap: 0.75rem; }
+    .modal-cancel {
+      flex: 1;
+      background: transparent;
+      border: 2px solid var(--border);
+      color: var(--muted);
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 800;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .modal-cancel:hover { color: var(--text); border-color: var(--text); }
+    .modal-confirm {
+      flex: 1;
+      background: var(--red);
+      border: none;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 900;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .modal-confirm:hover { background: var(--red-dark); }
+
+    /* ── Alerts panel ───────────────────────────────────────── */
+    .alerts-panel { display: none; margin-top: 2rem; }
+    .alerts-panel.visible { display: block; }
+    .alerts-panel h2 { font-size: 1.1rem; font-weight: 900; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .alerts-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .alert-item {
+      background: white;
+      border: 1.5px solid var(--border);
+      border-left: 4px solid var(--red);
+      border-radius: 10px;
+      padding: 0.875rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: var(--shadow);
+    }
+    .alert-info { flex: 1; }
+    .alert-name { font-weight: 900; font-size: 0.92rem; }
+    .alert-target { font-size: 0.8rem; color: var(--muted); font-weight: 700; margin-top: 2px; }
+    .alert-delete {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: color 0.15s;
+      font-family: inherit;
+    }
+    .alert-delete:hover { color: var(--red); }
+
+    /* ── Toast ──────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: white;
+      border: 2px solid var(--red);
+      color: var(--text);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 800;
+      font-family: inherit;
+      box-shadow: var(--shadow-lg);
+      z-index: 300;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast .toast-icon { margin-right: 6px; }
+
+    /* ── Stats bar ──────────────────────────────────────────── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: white;
+      border: 1.5px solid var(--border);
+      border-top: 4px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .stat-card:first-child  { border-top-color: var(--red); }
+    .stat-card:nth-child(2) { border-top-color: var(--muted); }
+    .stat-card:last-child   { border-top-color: var(--yellow-dark); }
+    .stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 800; margin-bottom: 0.25rem; }
+    .stat-value { font-size: 1.55rem; font-weight: 900; letter-spacing: -0.5px; }
+    .stat-card:first-child .stat-value { color: var(--red); }
+    .stat-card:last-child  .stat-value { color: var(--green); }
+    .stat-sub { font-size: 0.73rem; color: var(--muted); font-weight: 700; margin-top: 2px; }
+
+    @media (max-width: 600px) {
+      .stats-bar { grid-template-columns: 1fr 1fr; }
+      .stats-bar .stat-card:last-child { display: none; }
+      #results { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <div class="logo-ball"></div>
+      PokePrice
+    </a>
+    <span class="badge">Beta</span>
+    <nav>
+      <button class="nav-btn active" onclick="showTab('search')">Search</button>
+      <button class="nav-btn" onclick="showTab('alerts')">Alerts <span id="alert-count-badge" style="display:none; background:var(--yellow); color:#1A1A1A; border-radius:99px; font-size:0.7rem; font-weight:800; padding:1px 6px; margin-left:2px;"></span></button>
+    </nav>
+  </div>
+</header>
+
+<!-- Alert Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>Set Price Alert</h2>
+    <p class="modal-sub">Get notified when <span class="modal-card" id="modal-card-name"></span> drops below your target.</p>
+    <div class="form-group">
+      <label class="form-label">Target Price (£)</label>
+      <input class="form-input" id="alert-price" type="number" min="0" step="0.01" placeholder="e.g. 45.00" />
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" onclick="confirmAlert()">Set Alert</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span class="toast-icon">✓</span><span id="toast-msg"></span></div>
+
+<main>
+  <!-- Hero + Search -->
+  <div class="hero">
+    <h1>Track <span>Pokémon</span> Card Prices</h1>
+    <p>Compare listings across marketplaces and find the best deals.</p>
+    <div class="search-wrap">
+      <div class="search-input-wrap">
+        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input id="search" type="text" placeholder="e.g. Charizard, Pikachu VMAX, Blastoise..." autocomplete="off" />
+      </div>
+      <button class="search-btn" onclick="runSearch()">Search</button>
+    </div>
+    <div class="suggestions">
+      <span class="suggestion-chip" onclick="quickSearch('Charizard')">Charizard</span>
+      <span class="suggestion-chip" onclick="quickSearch('Pikachu')">Pikachu</span>
+      <span class="suggestion-chip" onclick="quickSearch('Mewtwo')">Mewtwo</span>
+      <span class="suggestion-chip" onclick="quickSearch('Blastoise')">Blastoise</span>
+      <span class="suggestion-chip" onclick="quickSearch('Umbreon')">Umbreon</span>
+    </div>
+  </div>
+
+  <!-- Search Tab -->
+  <div id="tab-search">
+    <!-- Stats -->
+    <div class="stats-bar" id="stats-bar" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-label">Lowest Price</div>
+        <div class="stat-value" id="stat-low">—</div>
+        <div class="stat-sub" id="stat-low-mp">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Market Price</div>
+        <div class="stat-value" id="stat-market">—</div>
+        <div class="stat-sub">avg across listings</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Best Deal</div>
+        <div class="stat-value" id="stat-deal">—</div>
+        <div class="stat-sub" id="stat-deal-mp">—</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters" id="filters-row" style="display:none;">
+      <span class="filter-label">Filter:</span>
+      <select class="filter-select" id="filter-marketplace" onchange="applyFilters()">
+        <option value="">All Marketplaces</option>
+        <option value="eBay">eBay</option>
+        <option value="TCGPlayer">TCGPlayer</option>
+        <option value="CardMarket">CardMarket</option>
+        <option value="Mercari">Mercari</option>
+      </select>
+      <select class="filter-select" id="filter-condition" onchange="applyFilters()">
+        <option value="">All Conditions</option>
+        <option value="PSA 10">PSA 10</option>
+        <option value="PSA 9">PSA 9</option>
+        <option value="Near Mint">Near Mint</option>
+        <option value="Lightly Played">Lightly Played</option>
+        <option value="Moderately Played">Moderately Played</option>
+      </select>
+      <select class="filter-select" id="filter-sort" onchange="applyFilters()">
+        <option value="deal">Best Deal</option>
+        <option value="price-asc">Price: Low to High</option>
+        <option value="price-desc">Price: High to Low</option>
+      </select>
+      <span class="result-count" id="result-count"></span>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="empty-state">
+        <div class="big">🃏</div>
+        <h3>Search for a card above</h3>
+        <p>Try "Charizard Base Set" or "Pikachu VMAX"</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alerts Tab -->
+  <div id="tab-alerts" style="display:none;">
+    <div id="alerts-empty" class="empty-state">
+      <div class="big">🔔</div>
+      <h3>No alerts set</h3>
+      <p>Search for a card and click "Set Alert" to get notified on price drops.</p>
+    </div>
+    <div class="alerts-list" id="alerts-list"></div>
+  </div>
+</main>
+
+<script>
+  // ─── Mock Data ───────────────────────────────────────────────────────────────
+  const MOCK_DB = [
+    // Charizard
+    { id:1,  name:'Charizard', set:'Base Set (Shadowless)', marketplace:'eBay',       price:1250.00, market:1400.00, condition:'PSA 10', img:'🔥' },
+    { id:2,  name:'Charizard', set:'Base Set (Shadowless)', marketplace:'Mercari',    price:1180.00, market:1400.00, condition:'PSA 9',  img:'🔥' },
+    { id:3,  name:'Charizard', set:'Base Set',              marketplace:'CardMarket', price: 420.00, market: 480.00, condition:'Near Mint', img:'🔥' },
+    { id:4,  name:'Charizard', set:'Base Set',              marketplace:'eBay',       price: 510.00, market: 480.00, condition:'Near Mint', img:'🔥' },
+    { id:5,  name:'Charizard', set:'Evolutions',            marketplace:'TCGPlayer',  price:  18.50, market:  22.00, condition:'Near Mint', img:'🔥' },
+    { id:6,  name:'Charizard', set:'Evolutions',            marketplace:'CardMarket', price:  14.99, market:  22.00, condition:'Lightly Played', img:'🔥' },
+    { id:7,  name:'Charizard VMAX', set:'Shining Fates',   marketplace:'TCGPlayer',  price:  72.00, market:  85.00, condition:'Near Mint', img:'🔥' },
+    { id:8,  name:'Charizard VMAX', set:'Shining Fates',   marketplace:'eBay',       price:  78.00, market:  85.00, condition:'Near Mint', img:'🔥' },
+    // Pikachu
+    { id:9,  name:'Pikachu',    set:'Base Set',             marketplace:'eBay',       price: 145.00, market: 160.00, condition:'PSA 10', img:'⚡' },
+    { id:10, name:'Pikachu',    set:'Base Set',             marketplace:'CardMarket', price:  28.00, market:  32.00, condition:'Near Mint', img:'⚡' },
+    { id:11, name:'Pikachu VMAX', set:'Vivid Voltage',      marketplace:'TCGPlayer',  price:  38.00, market:  45.00, condition:'Near Mint', img:'⚡' },
+    { id:12, name:'Pikachu VMAX', set:'Vivid Voltage',      marketplace:'Mercari',    price:  42.00, market:  45.00, condition:'Near Mint', img:'⚡' },
+    { id:13, name:'Pikachu',    set:'Jungle',               marketplace:'eBay',       price:  55.00, market:  50.00, condition:'Near Mint', img:'⚡' },
+    { id:14, name:'Pikachu',    set:'Promo',                marketplace:'CardMarket', price:  12.00, market:  15.00, condition:'Lightly Played', img:'⚡' },
+    // Mewtwo
+    { id:15, name:'Mewtwo',     set:'Base Set',             marketplace:'eBay',       price: 320.00, market: 380.00, condition:'PSA 10', img:'🔮' },
+    { id:16, name:'Mewtwo',     set:'Base Set',             marketplace:'CardMarket', price:  62.00, market:  70.00, condition:'Near Mint', img:'🔮' },
+    { id:17, name:'Mewtwo GX',  set:'Shining Legends',      marketplace:'TCGPlayer',  price:  22.00, market:  28.00, condition:'Near Mint', img:'🔮' },
+    { id:18, name:'Mewtwo V',   set:'Sword & Shield Promo', marketplace:'Mercari',    price:  14.00, market:  18.00, condition:'Near Mint', img:'🔮' },
+    // Blastoise
+    { id:19, name:'Blastoise',  set:'Base Set',             marketplace:'eBay',       price: 580.00, market: 650.00, condition:'PSA 10', img:'🌊' },
+    { id:20, name:'Blastoise',  set:'Base Set',             marketplace:'CardMarket', price:  95.00, market: 110.00, condition:'Near Mint', img:'🌊' },
+    { id:21, name:'Blastoise V', set:'Battle Styles',       marketplace:'TCGPlayer',  price:  16.00, market:  20.00, condition:'Near Mint', img:'🌊' },
+    { id:22, name:'Blastoise VMAX', set:'Battle Styles',    marketplace:'eBay',       price:  55.00, market:  60.00, condition:'Near Mint', img:'🌊' },
+    // Umbreon
+    { id:23, name:'Umbreon VMAX', set:'Evolving Skies',     marketplace:'TCGPlayer',  price: 115.00, market: 140.00, condition:'Near Mint', img:'🌙' },
+    { id:24, name:'Umbreon VMAX', set:'Evolving Skies',     marketplace:'eBay',       price: 108.00, market: 140.00, condition:'Near Mint', img:'🌙' },
+    { id:25, name:'Umbreon VMAX', set:'Evolving Skies',     marketplace:'CardMarket', price:  98.00, market: 140.00, condition:'Near Mint', img:'🌙' },
+    { id:26, name:'Umbreon VMAX', set:'Evolving Skies',     marketplace:'eBay',       price: 420.00, market: 500.00, condition:'PSA 10', img:'🌙' },
+    { id:27, name:'Umbreon V',  set:'Evolving Skies',       marketplace:'TCGPlayer',  price:  22.00, market:  28.00, condition:'Near Mint', img:'🌙' },
+    // Extra variety
+    { id:28, name:'Lugia',      set:'Neo Genesis',          marketplace:'eBay',       price: 870.00, market: 920.00, condition:'PSA 10', img:'✨' },
+    { id:29, name:'Lugia',      set:'Neo Genesis',          marketplace:'CardMarket', price: 155.00, market: 180.00, condition:'Near Mint', img:'✨' },
+    { id:30, name:'Rayquaza',   set:'Dragon Frontiers',     marketplace:'eBay',       price: 2100.00, market:2400.00, condition:'PSA 10', img:'🐉' },
+    { id:31, name:'Rayquaza VMAX', set:'Evolving Skies',    marketplace:'TCGPlayer',  price:  88.00, market:  95.00, condition:'Near Mint', img:'🐉' },
+    { id:32, name:'Mew',        set:'Celebrations',         marketplace:'CardMarket', price:   8.50, market:  12.00, condition:'Near Mint', img:'🎀' },
+    { id:33, name:'Mew VMAX',   set:'Fusion Strike',        marketplace:'TCGPlayer',  price:  34.00, market:  40.00, condition:'Near Mint', img:'🎀' },
+  ];
+
+  let alerts = [];
+  let currentResults = [];
+  let alertTarget = null;
+
+  // ─── Search ──────────────────────────────────────────────────────────────────
+  function quickSearch(term) {
+    document.getElementById('search').value = term;
+    runSearch();
+  }
+
+  document.getElementById('search').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runSearch();
+  });
+
+  function runSearch() {
+    const query = document.getElementById('search').value.trim().toLowerCase();
+    if (!query) return;
+
+    const raw = MOCK_DB.filter(c =>
+      c.name.toLowerCase().includes(query) || c.set.toLowerCase().includes(query)
+    );
+
+    currentResults = raw;
+    document.getElementById('stats-bar').style.display = raw.length ? 'grid' : 'none';
+    document.getElementById('filters-row').style.display = raw.length ? 'flex' : 'none';
+
+    if (raw.length) {
+      updateStats(raw);
+      // Reset filters
+      document.getElementById('filter-marketplace').value = '';
+      document.getElementById('filter-condition').value = '';
+      document.getElementById('filter-sort').value = 'deal';
+    }
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const mp   = document.getElementById('filter-marketplace').value;
+    const cond = document.getElementById('filter-condition').value;
+    const sort = document.getElementById('filter-sort').value;
+
+    let filtered = currentResults.filter(c => {
+      if (mp   && c.marketplace !== mp)   return false;
+      if (cond && c.condition   !== cond) return false;
+      return true;
+    });
+
+    if (sort === 'price-asc')  filtered.sort((a,b) => a.price - b.price);
+    if (sort === 'price-desc') filtered.sort((a,b) => b.price - a.price);
+    if (sort === 'deal')       filtered.sort((a,b) => dealScore(b) - dealScore(a));
+
+    renderResults(filtered);
+  }
+
+  function dealScore(c) { return c.market - c.price; }
+  function dealPct(c)   { return ((c.market - c.price) / c.market) * 100; }
+
+  function updateStats(results) {
+    const sorted = [...results].sort((a,b) => a.price - b.price);
+    const low  = sorted[0];
+    const avg  = results.reduce((s,c) => s + c.market, 0) / results.length;
+    const best = [...results].sort((a,b) => dealScore(b) - dealScore(a))[0];
+
+    document.getElementById('stat-low').textContent    = fmt(low.price);
+    document.getElementById('stat-low-mp').textContent = low.marketplace;
+    document.getElementById('stat-market').textContent = fmt(avg);
+    document.getElementById('stat-deal').textContent   = dealScore(best) > 0 ? `${fmt(dealScore(best))} off` : 'At market';
+    document.getElementById('stat-deal-mp').textContent = best.marketplace;
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
+  function renderResults(results) {
+    const el = document.getElementById('results');
+    document.getElementById('result-count').textContent =
+      results.length ? `${results.length} listing${results.length !== 1 ? 's' : ''}` : '';
+
+    if (!results.length) {
+      el.innerHTML = `<div class="empty-state">
+        <div class="big">😕</div>
+        <h3>No listings found</h3>
+        <p>Try adjusting your filters or search term</p>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = results.map(c => {
+      const score   = dealScore(c);
+      const pct     = dealPct(c);
+      const hasAlert = alerts.some(a => a.id === c.id);
+
+      const dealClass = pct >= 15 ? 'deal-great' : pct >= 5 ? 'deal-good' : score >= 0 ? 'deal-fair' : 'deal-poor';
+      const dealLabel = pct >= 15 ? `🔥 ${pct.toFixed(0)}% below` : pct >= 5 ? `✓ ${pct.toFixed(0)}% below` : score >= 0 ? 'At market' : `${Math.abs(pct).toFixed(0)}% above`;
+
+      const mpClass = {eBay:'mp-ebay', TCGPlayer:'mp-tcg', CardMarket:'mp-cardmkt', Mercari:'mp-merc'}[c.marketplace] || 'mp-ebay';
+      const condClass = {'PSA 10':'cond-psa10','PSA 9':'cond-psa9','Near Mint':'cond-nm','Lightly Played':'cond-lp','Moderately Played':'cond-mp'}[c.condition] || 'cond-nm';
+
+      const savingHtml = score > 0
+        ? `<span class="price-saving">save ${fmt(score)}</span>`
+        : score < 0
+        ? `<span class="price-over">${fmt(Math.abs(score))} over</span>`
+        : '';
+
+      // img src left empty — replace with c.imageUrl once eBay photos are wired in
+      const thumbHtml = c.imageUrl
+        ? `<img src="${c.imageUrl}" alt="${c.name}" />`
+        : `<div class="card-thumb-placeholder">
+             <span class="card-thumb-emoji">${c.img}</span>
+             <span class="card-thumb-label">No image</span>
+           </div>`;
+
+      return `<div class="listing-card">
+        <div class="card-thumb">${thumbHtml}</div>
+        <div class="card-body">
+          <div class="listing-top">
+            <div>
+              <div class="card-name">${c.name}</div>
+              <div class="card-set">${c.set}</div>
+            </div>
+            <span class="deal-badge ${dealClass}">${dealLabel}</span>
+          </div>
+          <div class="listing-meta">
+            <div class="meta-item">
+              <span class="meta-label">Marketplace</span>
+              <span class="meta-value marketplace-chip">
+                <span class="mp-dot ${mpClass}"></span>${c.marketplace}
+              </span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Condition</span>
+              <span class="meta-value"><span class="condition-pill ${condClass}">${c.condition}</span></span>
+            </div>
+          </div>
+          <div class="price-row">
+            <span class="price-listing">${fmt(c.price)}</span>
+            <span class="price-market">mkt ${fmt(c.market)}</span>
+            ${savingHtml}
+          </div>
+          <div class="listing-actions">
+            <button class="btn-view" onclick="viewListing(${c.id})">View Listing ↗</button>
+            <button class="btn-alert ${hasAlert ? 'active' : ''}" id="alert-btn-${c.id}" onclick="openModal(${c.id})">
+              🔔 ${hasAlert ? 'Alert Set' : 'Set Alert'}
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Modal ───────────────────────────────────────────────────────────────────
+  function openModal(cardId) {
+    const card = MOCK_DB.find(c => c.id === cardId);
+    alertTarget = cardId;
+    document.getElementById('modal-card-name').textContent = `${card.name} (${card.set})`;
+    document.getElementById('alert-price').value = (card.price * 0.9).toFixed(2);
+    document.getElementById('modal').classList.add('open');
+    setTimeout(() => document.getElementById('alert-price').focus(), 100);
+  }
+
+  function closeModal() {
+    document.getElementById('modal').classList.remove('open');
+    alertTarget = null;
+  }
+
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) closeModal();
+  });
+
+  function confirmAlert() {
+    const price = parseFloat(document.getElementById('alert-price').value);
+    if (!price || price <= 0) { showToast('⚠ Please enter a valid price'); return; }
+
+    const card = MOCK_DB.find(c => c.id === alertTarget);
+    const existing = alerts.findIndex(a => a.id === alertTarget);
+    if (existing > -1) alerts.splice(existing, 1);
+
+    alerts.push({ id: alertTarget, name: card.name, set: card.set, target: price, img: card.img });
+    closeModal();
+    renderAlerts();
+    updateAlertButtons();
+    showToast(`🔔 Alert set for ${card.name} below £${price.toFixed(2)}`);
+  }
+
+  // ─── Alerts ──────────────────────────────────────────────────────────────────
+  function renderAlerts() {
+    const empty = document.getElementById('alerts-empty');
+    const list  = document.getElementById('alerts-list');
+    const badge = document.getElementById('alert-count-badge');
+
+    if (alerts.length) {
+      empty.style.display = 'none';
+      badge.style.display = 'inline';
+      badge.textContent = alerts.length;
+      list.innerHTML = alerts.map(a => `
+        <div class="alert-item">
+          <span style="font-size:1.3rem">${a.img}</span>
+          <div class="alert-info">
+            <div class="alert-name">${a.name}</div>
+            <div class="alert-target">${a.set} · Alert below <strong style="color:var(--accent)">£${a.target.toFixed(2)}</strong></div>
+          </div>
+          <button class="alert-delete" onclick="deleteAlert(${a.id})" title="Remove alert">✕</button>
+        </div>
+      `).join('');
+    } else {
+      empty.style.display = 'block';
+      badge.style.display = 'none';
+      list.innerHTML = '';
+    }
+  }
+
+  function deleteAlert(id) {
+    alerts = alerts.filter(a => a.id !== id);
+    renderAlerts();
+    updateAlertButtons();
+    showToast('Alert removed');
+  }
+
+  function updateAlertButtons() {
+    MOCK_DB.forEach(c => {
+      const btn = document.getElementById(`alert-btn-${c.id}`);
+      if (!btn) return;
+      const has = alerts.some(a => a.id === c.id);
+      btn.classList.toggle('active', has);
+      btn.textContent = (has ? '🔔 Alert Set' : '🔔 Set Alert');
+    });
+  }
+
+  // ─── Tabs ─────────────────────────────────────────────────────────────────────
+  function showTab(tab) {
+    document.getElementById('tab-search').style.display = tab === 'search' ? 'block' : 'none';
+    document.getElementById('tab-alerts').style.display = tab === 'alerts' ? 'block' : 'none';
+    document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('active', (i===0) === (tab==='search')));
+    if (tab === 'alerts') renderAlerts();
+  }
+
+  // ─── Utils ───────────────────────────────────────────────────────────────────
+  function fmt(n) { return '£' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+  function viewListing(id) {
+    const c = MOCK_DB.find(x => x.id === id);
+    showToast(`↗ Opening ${c.marketplace} listing for ${c.name}…`);
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>
