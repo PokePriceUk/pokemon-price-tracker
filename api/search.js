@@ -54,9 +54,11 @@ module.exports = async function handler(req, res) {
   try {
     const token = await getAccessToken();
 
+    // Request extra results so there's plenty left after client-side filtering
     const params = new URLSearchParams({
       q: `${q.trim()} pokemon card`,
-      limit: '24',
+      category_ids: '183454', // eBay UK: Pokémon TCG → Individual Cards
+      limit: '50',
       sort: 'price',
     });
 
@@ -80,17 +82,22 @@ module.exports = async function handler(req, res) {
     const data = await apiRes.json();
     const items = data.itemSummaries || [];
 
-    const listings = items.map(item => ({
-      id:          item.itemId,
-      name:        item.title || 'Unknown Card',
-      set:         item.buyingOptions?.includes('FIXED_PRICE') ? 'Buy It Now' : 'Auction',
-      marketplace: 'eBay',
-      price:       parseFloat(item.price?.value ?? 0),
-      currency:    item.price?.currency ?? 'GBP',
-      imageUrl:    item.thumbnailImages?.[0]?.imageUrl ?? item.image?.imageUrl ?? null,
-      condition:   parseCondition(item),
-      itemUrl:     item.itemWebUrl ?? null,
-    }));
+    const EXCLUDE = /\b(keyring|key\s*ring|plush|toy|figure|figurine|poster|pin|badge|sleeve|binder|booster|pack|bundle|lot|collection|box|tin|deck|display|album|folder|playmat|costume|shirt|hoodie|mug|sticker|magnet|lanyard|backpack|bag|cap|hat)\b/i;
+
+    const listings = items
+      .filter(item => !EXCLUDE.test(item.title || ''))
+      .slice(0, 24)
+      .map(item => ({
+        id:          item.itemId,
+        name:        item.title || 'Unknown Card',
+        set:         item.buyingOptions?.includes('FIXED_PRICE') ? 'Buy It Now' : 'Auction',
+        marketplace: 'eBay',
+        price:       parseFloat(item.price?.value ?? 0),
+        currency:    item.price?.currency ?? 'GBP',
+        imageUrl:    item.thumbnailImages?.[0]?.imageUrl ?? item.image?.imageUrl ?? null,
+        condition:   parseCondition(item),
+        itemUrl:     item.itemWebUrl ?? null,
+      }));
 
     // Median is more stable than mean for skewed price sets
     const prices = listings.map(l => l.price).filter(p => p > 0).sort((a, b) => a - b);
