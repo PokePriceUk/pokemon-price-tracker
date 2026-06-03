@@ -6,6 +6,7 @@
   <title>PokePrice — Card Price Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
     :root {
       --bg:          #F0EEEA;
@@ -164,7 +165,9 @@
       transform: translateY(-50%);
       color: var(--muted);
       pointer-events: none;
+      font-size: 0.88rem;
     }
+    .card-thumb-icon { font-size: 1.4rem; color: var(--border); line-height: 1; }
     #search {
       width: 100%;
       background: white;
@@ -351,6 +354,10 @@
       flex: 1;
       margin-right: 0.5rem;
       color: var(--text);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
     }
     .card-set {
       font-size: 0.73rem;
@@ -652,6 +659,55 @@
     .stat-card:last-child  .stat-value { color: var(--green); }
     .stat-sub { font-size: 0.73rem; color: var(--muted); font-weight: 700; margin-top: 2px; }
 
+    /* ── Featured banner ──────────────────────────────────────── */
+    #featured-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    #featured-banner h2 {
+      font-size: 1.05rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    #featured-banner h2 i { color: var(--red); }
+    #featured-banner p { color: var(--muted); font-size: 0.83rem; font-weight: 600; }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      border-top: 1.5px solid var(--border);
+      margin-top: 4rem;
+      padding: 2rem 2rem 2.5rem;
+      text-align: center;
+      background: white;
+    }
+    .footer-inner { max-width: 1100px; margin: 0 auto; }
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+    .footer-brand i { color: var(--red); font-size: 1rem; }
+    .footer-tagline { color: var(--muted); font-size: 0.88rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .footer-links { display: flex; justify-content: center; gap: 1.5rem; flex-wrap: wrap; }
+    .footer-links a {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover { color: var(--red); }
+
     @media (max-width: 600px) {
       .stats-bar { grid-template-columns: 1fr 1fr; }
       .stats-bar .stat-card:last-child { display: none; }
@@ -694,7 +750,7 @@
 </div>
 
 <!-- Toast -->
-<div class="toast" id="toast"><span class="toast-icon">✓</span><span id="toast-msg"></span></div>
+<div class="toast" id="toast"><i id="toast-icon" class="fa-solid fa-check"></i> <span id="toast-msg"></span></div>
 
 <main>
   <!-- Hero + Search -->
@@ -703,9 +759,7 @@
     <p>Compare listings across marketplaces and find the best deals.</p>
     <div class="search-wrap">
       <div class="search-input-wrap">
-        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
         <input id="search" type="text" placeholder="e.g. Charizard, Pikachu VMAX, Blastoise..." autocomplete="off" />
       </div>
       <button class="search-btn" onclick="runSearch()">Search</button>
@@ -766,20 +820,18 @@
       <span class="result-count" id="result-count"></span>
     </div>
 
-    <!-- Results -->
-    <div id="results">
-      <div class="empty-state">
-        <div class="big">🃏</div>
-        <h3>Search for a card above</h3>
-        <p>Try "Charizard Base Set" or "Pikachu VMAX"</p>
-      </div>
+    <!-- Featured / Results -->
+    <div id="featured-banner">
+      <h2><i class="fa-solid fa-fire"></i> Popular right now</h2>
+      <p>Here are some popular picks — search above to find any card.</p>
     </div>
+    <div id="results"></div>
   </div>
 
   <!-- Alerts Tab -->
   <div id="tab-alerts" style="display:none;">
     <div id="alerts-empty" class="empty-state">
-      <div class="big">🔔</div>
+      <div class="big"><i class="fa-regular fa-bell" style="color:var(--muted)"></i></div>
       <h3>No alerts set</h3>
       <p>Search for a card and click "Set Alert" to get notified on price drops.</p>
     </div>
@@ -832,7 +884,8 @@
   ];
 
   let alerts = [];
-  let currentResults = [];
+  let currentResults = [];  // full results for current search (used by filters)
+  let renderedResults = []; // what's actually on screen (filtered subset)
   let alertTarget = null;
 
   // ─── Search ──────────────────────────────────────────────────────────────────
@@ -845,26 +898,48 @@
     if (e.key === 'Enter') runSearch();
   });
 
-  function runSearch() {
-    const query = document.getElementById('search').value.trim().toLowerCase();
+  async function runSearch() {
+    const query = document.getElementById('search').value.trim();
     if (!query) return;
+    document.getElementById('featured-banner').style.display = 'none';
+    document.getElementById('stats-bar').style.display = 'none';
+    document.getElementById('filters-row').style.display = 'none';
 
-    const raw = MOCK_DB.filter(c =>
-      c.name.toLowerCase().includes(query) || c.set.toLowerCase().includes(query)
-    );
+    document.getElementById('results').innerHTML = `
+      <div class="empty-state">
+        <div class="big"><i class="fa-solid fa-spinner fa-spin" style="color:var(--red)"></i></div>
+        <h3>Searching eBay…</h3>
+        <p>Finding live listings for "${query}"</p>
+      </div>`;
 
-    currentResults = raw;
-    document.getElementById('stats-bar').style.display = raw.length ? 'grid' : 'none';
-    document.getElementById('filters-row').style.display = raw.length ? 'flex' : 'none';
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
+      const { listings } = await res.json();
 
-    if (raw.length) {
-      updateStats(raw);
-      // Reset filters
-      document.getElementById('filter-marketplace').value = '';
-      document.getElementById('filter-condition').value = '';
-      document.getElementById('filter-sort').value = 'deal';
+      currentResults = listings;
+      document.getElementById('stats-bar').style.display = listings.length ? 'grid' : 'none';
+      document.getElementById('filters-row').style.display = listings.length ? 'flex' : 'none';
+
+      if (listings.length) {
+        updateStats(listings);
+        document.getElementById('filter-marketplace').value = '';
+        document.getElementById('filter-condition').value = '';
+        document.getElementById('filter-sort').value = 'deal';
+      }
+      applyFilters();
+    } catch (err) {
+      console.error(err);
+      document.getElementById('results').innerHTML = `
+        <div class="empty-state">
+          <div class="big"><i class="fa-solid fa-triangle-exclamation" style="color:var(--red)"></i></div>
+          <h3>Something went wrong</h3>
+          <p>${err.message}</p>
+        </div>`;
     }
-    applyFilters();
   }
 
   function applyFilters() {
@@ -902,6 +977,75 @@
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
+  function cardKey(c) { return String(c.id).replace(/\W/g, '_'); }
+
+  function buildCardHTML(c, idx) {
+    const score    = dealScore(c);
+    const pct      = dealPct(c);
+    const hasAlert = alerts.some(a => a.key === cardKey(c));
+
+    const dealClass = pct >= 15 ? 'deal-great' : pct >= 5 ? 'deal-good' : score >= 0 ? 'deal-fair' : 'deal-poor';
+    const dealLabel = pct >= 15
+      ? `<i class="fa-solid fa-fire"></i> ${pct.toFixed(0)}% below`
+      : pct >= 5
+      ? `<i class="fa-solid fa-check"></i> ${pct.toFixed(0)}% below`
+      : score >= 0 ? 'At market'
+      : `<i class="fa-solid fa-arrow-up"></i> ${Math.abs(pct).toFixed(0)}% above`;
+
+    const mpClass   = {eBay:'mp-ebay', TCGPlayer:'mp-tcg', CardMarket:'mp-cardmkt', Mercari:'mp-merc'}[c.marketplace] || 'mp-ebay';
+    const condClass = {'PSA 10':'cond-psa10','PSA 9':'cond-psa9','Near Mint':'cond-nm','Lightly Played':'cond-lp','Moderately Played':'cond-mp'}[c.condition] || 'cond-nm';
+
+    const savingHtml = score > 0
+      ? `<span class="price-saving"><i class="fa-solid fa-arrow-down"></i> save ${fmt(score)}</span>`
+      : score < 0
+      ? `<span class="price-over"><i class="fa-solid fa-arrow-up"></i> ${fmt(Math.abs(score))} over</span>`
+      : '';
+
+    // swap src to a real URL when eBay photos are connected
+    const thumbHtml = c.imageUrl
+      ? `<img src="${c.imageUrl}" alt="${c.name}" />`
+      : `<div class="card-thumb-placeholder">
+           <i class="fa-regular fa-image card-thumb-icon"></i>
+           <span class="card-thumb-label">Photo</span>
+         </div>`;
+
+    return `<div class="listing-card">
+      <div class="card-thumb">${thumbHtml}</div>
+      <div class="card-body">
+        <div class="listing-top">
+          <div>
+            <div class="card-name">${c.name}</div>
+            <div class="card-set">${c.set}</div>
+          </div>
+          <span class="deal-badge ${dealClass}">${dealLabel}</span>
+        </div>
+        <div class="listing-meta">
+          <div class="meta-item">
+            <span class="meta-label">Marketplace</span>
+            <span class="meta-value marketplace-chip">
+              <span class="mp-dot ${mpClass}"></span>${c.marketplace}
+            </span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Condition</span>
+            <span class="meta-value"><span class="condition-pill ${condClass}">${c.condition}</span></span>
+          </div>
+        </div>
+        <div class="price-row">
+          <span class="price-listing">${fmt(c.price)}</span>
+          <span class="price-market">mkt ${fmt(c.market)}</span>
+          ${savingHtml}
+        </div>
+        <div class="listing-actions">
+          <button class="btn-view" onclick="viewListing(${idx})">View Listing <i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+          <button class="btn-alert ${hasAlert ? 'active' : ''}" id="alert-btn-${idx}" onclick="openModal(${idx})">
+            <i class="fa-solid fa-bell"></i> ${hasAlert ? 'Alert Set' : 'Set Alert'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+
   function renderResults(results) {
     const el = document.getElementById('results');
     document.getElementById('result-count').textContent =
@@ -909,81 +1053,23 @@
 
     if (!results.length) {
       el.innerHTML = `<div class="empty-state">
-        <div class="big">😕</div>
+        <div class="big"><i class="fa-regular fa-face-sad-tear" style="color:var(--muted)"></i></div>
         <h3>No listings found</h3>
         <p>Try adjusting your filters or search term</p>
       </div>`;
       return;
     }
 
-    el.innerHTML = results.map(c => {
-      const score   = dealScore(c);
-      const pct     = dealPct(c);
-      const hasAlert = alerts.some(a => a.id === c.id);
-
-      const dealClass = pct >= 15 ? 'deal-great' : pct >= 5 ? 'deal-good' : score >= 0 ? 'deal-fair' : 'deal-poor';
-      const dealLabel = pct >= 15 ? `🔥 ${pct.toFixed(0)}% below` : pct >= 5 ? `✓ ${pct.toFixed(0)}% below` : score >= 0 ? 'At market' : `${Math.abs(pct).toFixed(0)}% above`;
-
-      const mpClass = {eBay:'mp-ebay', TCGPlayer:'mp-tcg', CardMarket:'mp-cardmkt', Mercari:'mp-merc'}[c.marketplace] || 'mp-ebay';
-      const condClass = {'PSA 10':'cond-psa10','PSA 9':'cond-psa9','Near Mint':'cond-nm','Lightly Played':'cond-lp','Moderately Played':'cond-mp'}[c.condition] || 'cond-nm';
-
-      const savingHtml = score > 0
-        ? `<span class="price-saving">save ${fmt(score)}</span>`
-        : score < 0
-        ? `<span class="price-over">${fmt(Math.abs(score))} over</span>`
-        : '';
-
-      // img src left empty — replace with c.imageUrl once eBay photos are wired in
-      const thumbHtml = c.imageUrl
-        ? `<img src="${c.imageUrl}" alt="${c.name}" />`
-        : `<div class="card-thumb-placeholder">
-             <span class="card-thumb-emoji">${c.img}</span>
-             <span class="card-thumb-label">No image</span>
-           </div>`;
-
-      return `<div class="listing-card">
-        <div class="card-thumb">${thumbHtml}</div>
-        <div class="card-body">
-          <div class="listing-top">
-            <div>
-              <div class="card-name">${c.name}</div>
-              <div class="card-set">${c.set}</div>
-            </div>
-            <span class="deal-badge ${dealClass}">${dealLabel}</span>
-          </div>
-          <div class="listing-meta">
-            <div class="meta-item">
-              <span class="meta-label">Marketplace</span>
-              <span class="meta-value marketplace-chip">
-                <span class="mp-dot ${mpClass}"></span>${c.marketplace}
-              </span>
-            </div>
-            <div class="meta-item">
-              <span class="meta-label">Condition</span>
-              <span class="meta-value"><span class="condition-pill ${condClass}">${c.condition}</span></span>
-            </div>
-          </div>
-          <div class="price-row">
-            <span class="price-listing">${fmt(c.price)}</span>
-            <span class="price-market">mkt ${fmt(c.market)}</span>
-            ${savingHtml}
-          </div>
-          <div class="listing-actions">
-            <button class="btn-view" onclick="viewListing(${c.id})">View Listing ↗</button>
-            <button class="btn-alert ${hasAlert ? 'active' : ''}" id="alert-btn-${c.id}" onclick="openModal(${c.id})">
-              🔔 ${hasAlert ? 'Alert Set' : 'Set Alert'}
-            </button>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    renderedResults = results;
+    el.innerHTML = results.map((c, i) => buildCardHTML(c, i)).join('');
   }
 
   // ─── Modal ───────────────────────────────────────────────────────────────────
-  function openModal(cardId) {
-    const card = MOCK_DB.find(c => c.id === cardId);
-    alertTarget = cardId;
-    document.getElementById('modal-card-name').textContent = `${card.name} (${card.set})`;
+  function openModal(idx) {
+    const card = renderedResults[idx];
+    alertTarget = idx;
+    const label = card.name.length > 50 ? card.name.slice(0, 50) + '…' : card.name;
+    document.getElementById('modal-card-name').textContent = label;
     document.getElementById('alert-price').value = (card.price * 0.9).toFixed(2);
     document.getElementById('modal').classList.add('open');
     setTimeout(() => document.getElementById('alert-price').focus(), 100);
@@ -1000,17 +1086,17 @@
 
   function confirmAlert() {
     const price = parseFloat(document.getElementById('alert-price').value);
-    if (!price || price <= 0) { showToast('⚠ Please enter a valid price'); return; }
+    if (!price || price <= 0) { showToast('Please enter a valid price', 'fa-triangle-exclamation'); return; }
 
-    const card = MOCK_DB.find(c => c.id === alertTarget);
-    const existing = alerts.findIndex(a => a.id === alertTarget);
-    if (existing > -1) alerts.splice(existing, 1);
-
-    alerts.push({ id: alertTarget, name: card.name, set: card.set, target: price, img: card.img });
+    const card = renderedResults[alertTarget];
+    const key = cardKey(card);
+    alerts = alerts.filter(a => a.key !== key);
+    alerts.push({ key, name: card.name, set: card.set || 'eBay', target: price });
     closeModal();
     renderAlerts();
     updateAlertButtons();
-    showToast(`🔔 Alert set for ${card.name} below £${price.toFixed(2)}`);
+    const shortName = card.name.split(' ').slice(0, 3).join(' ');
+    showToast(`Alert set for ${shortName} below £${price.toFixed(2)}`, 'fa-bell');
   }
 
   // ─── Alerts ──────────────────────────────────────────────────────────────────
@@ -1025,12 +1111,12 @@
       badge.textContent = alerts.length;
       list.innerHTML = alerts.map(a => `
         <div class="alert-item">
-          <span style="font-size:1.3rem">${a.img}</span>
+          <i class="fa-solid fa-tag" style="font-size:1.05rem; color:var(--muted); flex-shrink:0"></i>
           <div class="alert-info">
             <div class="alert-name">${a.name}</div>
-            <div class="alert-target">${a.set} · Alert below <strong style="color:var(--accent)">£${a.target.toFixed(2)}</strong></div>
+            <div class="alert-target">${a.set} · Alert below <strong style="color:var(--red)">£${a.target.toFixed(2)}</strong></div>
           </div>
-          <button class="alert-delete" onclick="deleteAlert(${a.id})" title="Remove alert">✕</button>
+          <button class="alert-delete" onclick="deleteAlert('${a.key}')" title="Remove alert"><i class="fa-solid fa-xmark"></i></button>
         </div>
       `).join('');
     } else {
@@ -1040,20 +1126,20 @@
     }
   }
 
-  function deleteAlert(id) {
-    alerts = alerts.filter(a => a.id !== id);
+  function deleteAlert(key) {
+    alerts = alerts.filter(a => a.key !== key);
     renderAlerts();
     updateAlertButtons();
     showToast('Alert removed');
   }
 
   function updateAlertButtons() {
-    MOCK_DB.forEach(c => {
-      const btn = document.getElementById(`alert-btn-${c.id}`);
+    renderedResults.forEach((c, idx) => {
+      const btn = document.getElementById(`alert-btn-${idx}`);
       if (!btn) return;
-      const has = alerts.some(a => a.id === c.id);
+      const has = alerts.some(a => a.key === cardKey(c));
       btn.classList.toggle('active', has);
-      btn.textContent = (has ? '🔔 Alert Set' : '🔔 Set Alert');
+      btn.innerHTML = `<i class="fa-solid fa-bell"></i> ${has ? 'Alert Set' : 'Set Alert'}`;
     });
   }
 
@@ -1065,22 +1151,48 @@
     if (tab === 'alerts') renderAlerts();
   }
 
+  // ─── Featured picks (shown on first load) ────────────────────────────────────
+  function showFeatured() {
+    const picks = [1, 11, 25].map(id => MOCK_DB.find(c => c.id === id));
+    currentResults = picks;
+    renderedResults = picks;
+    document.getElementById('results').innerHTML = picks.map((c, i) => buildCardHTML(c, i)).join('');
+  }
+  showFeatured();
+
   // ─── Utils ───────────────────────────────────────────────────────────────────
   function fmt(n) { return '£' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 
-  function viewListing(id) {
-    const c = MOCK_DB.find(x => x.id === id);
-    showToast(`↗ Opening ${c.marketplace} listing for ${c.name}…`);
+  function viewListing(idx) {
+    const c = renderedResults[idx];
+    if (c.itemUrl) {
+      window.open(c.itemUrl, '_blank', 'noopener');
+    } else {
+      showToast(`Opening ${c.marketplace} listing for ${c.name}…`, 'fa-arrow-up-right-from-square');
+    }
   }
 
   let toastTimer;
-  function showToast(msg) {
+  function showToast(msg, icon = 'fa-check') {
     const t = document.getElementById('toast');
+    document.getElementById('toast-icon').className = `fa-solid ${icon}`;
     document.getElementById('toast-msg').textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
   }
 </script>
+
+<footer>
+  <div class="footer-inner">
+    <p class="footer-brand"><i class="fa-solid fa-circle-half-stroke"></i> PokePrice</p>
+    <p class="footer-tagline">Real-time Pokémon card prices across eBay, TCGPlayer and CardMarket</p>
+    <div class="footer-links">
+      <a href="https://github.com/PokePriceUk/pokemon-price-tracker">GitHub</a>
+      <a href="#">About</a>
+      <a href="#">Report a bug</a>
+    </div>
+  </div>
+</footer>
 </body>
 </html>
