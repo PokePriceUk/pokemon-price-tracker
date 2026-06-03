@@ -158,7 +158,55 @@
       max-width: 620px;
       margin: 0 auto;
     }
-    .search-input-wrap { flex: 1; position: relative; }
+    .search-input-wrap { flex: 1; position: relative; z-index: 10; }
+
+    /* ── Autocomplete dropdown ────────────────────────────── */
+    .search-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 5px);
+      left: 0; right: 0;
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      z-index: 50;
+    }
+    .search-dropdown.open { display: block; }
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 9px 14px 9px 42px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover,
+    .suggestion-item.active { background: var(--bg); }
+    .suggestion-text { flex: 1; min-width: 0; }
+    .suggestion-name {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .suggestion-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
+      margin-top: 1px;
+    }
+    .suggestion-price {
+      font-size: 0.88rem;
+      font-weight: 900;
+      color: var(--red);
+      flex-shrink: 0;
+    }
     .search-icon {
       position: absolute;
       left: 14px; top: 50%;
@@ -761,6 +809,7 @@
       <div class="search-input-wrap">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
         <input id="search" type="text" placeholder="e.g. Charizard, Pikachu VMAX, Blastoise..." autocomplete="off" />
+        <div id="search-dropdown" class="search-dropdown"></div>
       </div>
       <button class="search-btn" onclick="runSearch()">Search</button>
     </div>
@@ -881,14 +930,100 @@
   let renderedResults = []; // what's actually on screen (filtered subset)
   let alertTarget = null;
 
+  // ─── Autocomplete ─────────────────────────────────────────────────────────────
+  let suggestTimer  = null;
+  let suggestAbort  = null;
+  let activeSuggIdx = -1;
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function hideSuggestions() {
+    document.getElementById('search-dropdown').classList.remove('open');
+    activeSuggIdx = -1;
+  }
+
+  function renderSuggestions(suggestions) {
+    const dropdown = document.getElementById('search-dropdown');
+    if (!suggestions.length) { hideSuggestions(); return; }
+    dropdown.innerHTML = suggestions.map(s => `
+      <div class="suggestion-item" data-query="${esc(s.query)}"
+           onmousedown="selectSuggestion(this.dataset.query)">
+        <div class="suggestion-text">
+          <div class="suggestion-name">${esc(s.name)}</div>
+          <div class="suggestion-sub">${esc(s.sub)}</div>
+        </div>
+        <span class="suggestion-price">${fmt(s.price)}</span>
+      </div>`).join('');
+    dropdown.classList.add('open');
+    activeSuggIdx = -1;
+  }
+
+  async function fetchSuggestions() {
+    const q = document.getElementById('search').value.trim();
+    if (q.length < 2) { hideSuggestions(); return; }
+    if (suggestAbort) suggestAbort.abort();
+    suggestAbort = new AbortController();
+    try {
+      const res = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`, {
+        signal: suggestAbort.signal,
+      });
+      if (!res.ok) return;
+      const { suggestions } = await res.json();
+      renderSuggestions(suggestions);
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('Suggest error:', err);
+    }
+  }
+
+  function selectSuggestion(query) {
+    document.getElementById('search').value = query;
+    hideSuggestions();
+    runSearch();
+  }
+
+  document.getElementById('search').addEventListener('input', () => {
+    activeSuggIdx = -1;
+    clearTimeout(suggestTimer);
+    const q = document.getElementById('search').value.trim();
+    if (q.length < 2) { hideSuggestions(); return; }
+    suggestTimer = setTimeout(fetchSuggestions, 300);
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (!e.target.closest('.search-input-wrap')) hideSuggestions();
+  });
+
   // ─── Search ──────────────────────────────────────────────────────────────────
   function quickSearch(term) {
     document.getElementById('search').value = term;
+    hideSuggestions();
     runSearch();
   }
 
   document.getElementById('search').addEventListener('keydown', e => {
-    if (e.key === 'Enter') runSearch();
+    const items = document.querySelectorAll('#search-dropdown .suggestion-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      activeSuggIdx = Math.min(activeSuggIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('active', i === activeSuggIdx));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      activeSuggIdx = Math.max(activeSuggIdx - 1, -1);
+      items.forEach((el, i) => el.classList.toggle('active', i === activeSuggIdx));
+    } else if (e.key === 'Enter') {
+      if (activeSuggIdx >= 0 && items[activeSuggIdx]) {
+        selectSuggestion(items[activeSuggIdx].dataset.query);
+      } else {
+        hideSuggestions();
+        runSearch();
+      }
+    } else if (e.key === 'Escape') {
+      hideSuggestions();
+    }
   });
 
   async function runSearch() {
