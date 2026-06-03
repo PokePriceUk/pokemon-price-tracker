@@ -308,7 +308,7 @@
     .card-thumb img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       display: block;
       border-radius: 6px;
     }
@@ -797,13 +797,6 @@
     <!-- Filters -->
     <div class="filters" id="filters-row" style="display:none;">
       <span class="filter-label">Filter:</span>
-      <select class="filter-select" id="filter-marketplace" onchange="applyFilters()">
-        <option value="">All Marketplaces</option>
-        <option value="eBay">eBay</option>
-        <option value="TCGPlayer">TCGPlayer</option>
-        <option value="CardMarket">CardMarket</option>
-        <option value="Mercari">Mercari</option>
-      </select>
       <select class="filter-select" id="filter-condition" onchange="applyFilters()">
         <option value="">All Conditions</option>
         <option value="PSA 10">PSA 10</option>
@@ -926,7 +919,7 @@
 
       if (listings.length) {
         updateStats(listings);
-        document.getElementById('filter-marketplace').value = '';
+
         document.getElementById('filter-condition').value = '';
         document.getElementById('filter-sort').value = 'deal';
       }
@@ -943,13 +936,11 @@
   }
 
   function applyFilters() {
-    const mp   = document.getElementById('filter-marketplace').value;
     const cond = document.getElementById('filter-condition').value;
     const sort = document.getElementById('filter-sort').value;
 
     let filtered = currentResults.filter(c => {
-      if (mp   && c.marketplace !== mp)   return false;
-      if (cond && c.condition   !== cond) return false;
+      if (cond && c.condition !== cond) return false;
       return true;
     });
 
@@ -1151,12 +1142,44 @@
     if (tab === 'alerts') renderAlerts();
   }
 
-  // ─── Featured picks (shown on first load) ────────────────────────────────────
-  function showFeatured() {
-    const picks = [1, 11, 25].map(id => MOCK_DB.find(c => c.id === id));
+  // ─── Featured picks (live eBay searches on first load) ───────────────────────
+  const FEATURED_QUERIES = [
+    'Charizard ex 199/165',
+    'Pikachu Grey Felt Hat',
+    'Umbreon VMAX',
+    'Rayquaza VMAX',
+    'Mewtwo ex',
+    'Lugia ex',
+  ];
+
+  async function showFeatured() {
+    document.getElementById('results').innerHTML = `
+      <div class="empty-state">
+        <div class="big"><i class="fa-solid fa-spinner fa-spin" style="color:var(--red)"></i></div>
+        <h3>Loading featured cards…</h3>
+        <p></p>
+      </div>`;
+
+    const picks = (await Promise.all(
+      FEATURED_QUERIES.map(async q => {
+        try {
+          const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+          if (!res.ok) return null;
+          const { listings } = await res.json();
+          return listings[0] ?? null;
+        } catch { return null; }
+      })
+    )).filter(Boolean);
+
     currentResults = picks;
     renderedResults = picks;
-    document.getElementById('results').innerHTML = picks.map((c, i) => buildCardHTML(c, i)).join('');
+    document.getElementById('results').innerHTML = picks.length
+      ? picks.map((c, i) => buildCardHTML(c, i)).join('')
+      : `<div class="empty-state">
+           <div class="big"><i class="fa-regular fa-face-sad-tear" style="color:var(--muted)"></i></div>
+           <h3>Couldn't load featured cards</h3>
+           <p>Search above to find any card</p>
+         </div>`;
   }
   showFeatured();
 
