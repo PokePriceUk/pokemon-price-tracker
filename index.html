@@ -332,10 +332,12 @@
       box-shadow: var(--shadow);
     }
     .listing-card:hover {
-      border-left-color: var(--red);
       transform: translateY(-3px);
       box-shadow: var(--shadow-lg);
     }
+    /* Marketplace badge chip */
+    .mp-chip-ebay    { background: rgba(229,50,56,0.1);  color: #b82020; padding: 2px 8px; border-radius: 6px; }
+    .mp-chip-cardmkt { background: rgba(0,158,149,0.1);  color: #007a73; padding: 2px 8px; border-radius: 6px; }
 
     /* ── Card image placeholder ─────────────────────────────── */
     /* swap src to a real URL when eBay photos are connected */
@@ -1036,25 +1038,26 @@
     document.getElementById('results').innerHTML = `
       <div class="empty-state">
         <div class="big"><i class="fa-solid fa-spinner fa-spin" style="color:var(--red)"></i></div>
-        <h3>Searching eBay…</h3>
-        <p>Finding live listings for "${query}"</p>
+        <h3>Searching marketplaces…</h3>
+        <p>Checking eBay and CardMarket for "${query}"</p>
       </div>`;
 
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Request failed (${res.status})`);
-      }
-      const { listings } = await res.json();
+      const [ebayRes, cmRes] = await Promise.allSettled([
+        fetch(`/api/search?q=${encodeURIComponent(query)}`).then(r => r.json()),
+        fetch(`/api/cardmarket?q=${encodeURIComponent(query)}`).then(r => r.json()),
+      ]);
 
-      currentResults = listings;
-      document.getElementById('stats-bar').style.display = listings.length ? 'grid' : 'none';
-      document.getElementById('filters-row').style.display = listings.length ? 'flex' : 'none';
+      const ebayListings = ebayRes.status === 'fulfilled' ? (ebayRes.value?.listings ?? []) : [];
+      const cmListings   = cmRes.status   === 'fulfilled' ? (cmRes.value?.listings   ?? []) : [];
+      const allListings  = [...ebayListings, ...cmListings];
 
-      if (listings.length) {
-        updateStats(listings);
+      currentResults = allListings;
+      document.getElementById('stats-bar').style.display = allListings.length ? 'grid' : 'none';
+      document.getElementById('filters-row').style.display = allListings.length ? 'flex' : 'none';
 
+      if (allListings.length) {
+        updateStats(allListings);
         document.getElementById('filter-condition').value = '';
         document.getElementById('filter-sort').value = 'deal';
       }
@@ -1081,7 +1084,7 @@
 
     if (sort === 'price-asc')  filtered.sort((a,b) => a.price - b.price);
     if (sort === 'price-desc') filtered.sort((a,b) => b.price - a.price);
-    if (sort === 'deal')       filtered.sort((a,b) => dealScore(b) - dealScore(a));
+    if (sort === 'deal')       filtered.sort((a,b) => dealPct(b) - dealPct(a));
 
     renderResults(filtered);
   }
@@ -1092,13 +1095,17 @@
   function updateStats(results) {
     const sorted = [...results].sort((a,b) => a.price - b.price);
     const low  = sorted[0];
-    const avg  = results.reduce((s,c) => s + c.market, 0) / results.length;
-    const best = [...results].sort((a,b) => dealScore(b) - dealScore(a))[0];
+    const best = [...results].sort((a,b) => dealPct(b) - dealPct(a))[0];
 
-    document.getElementById('stat-low').textContent    = fmt(low.price);
-    document.getElementById('stat-low-mp').textContent = low.marketplace;
-    document.getElementById('stat-market').textContent = fmt(avg);
-    document.getElementById('stat-deal').textContent   = dealScore(best) > 0 ? `${fmt(dealScore(best))} off` : 'At market';
+    // Market avg using the dominant currency so we don't mix £ and €
+    const dominant = results.filter(r => (r.currency || 'GBP') === (low.currency || 'GBP'));
+    const avg = dominant.reduce((s,c) => s + c.market, 0) / (dominant.length || 1);
+
+    document.getElementById('stat-low').textContent     = fmtPrice(low.price, low.currency);
+    document.getElementById('stat-low-mp').textContent  = low.marketplace;
+    document.getElementById('stat-market').textContent  = fmtPrice(avg, low.currency || 'GBP');
+    const bestPct = dealPct(best);
+    document.getElementById('stat-deal').textContent    = bestPct > 0 ? `${bestPct.toFixed(0)}% below` : 'At market';
     document.getElementById('stat-deal-mp').textContent = best.marketplace;
   }
 
@@ -1118,13 +1125,15 @@
       : score >= 0 ? 'At market'
       : `<i class="fa-solid fa-arrow-up"></i> ${Math.abs(pct).toFixed(0)}% above`;
 
-    const mpClass   = {eBay:'mp-ebay', TCGPlayer:'mp-tcg', CardMarket:'mp-cardmkt', Mercari:'mp-merc'}[c.marketplace] || 'mp-ebay';
-    const condClass = {'PSA 10':'cond-psa10','PSA 9':'cond-psa9','Near Mint':'cond-nm','Lightly Played':'cond-lp','Moderately Played':'cond-mp'}[c.condition] || 'cond-nm';
+    const mpClass    = {eBay:'mp-ebay', CardMarket:'mp-cardmkt'}[c.marketplace] || 'mp-ebay';
+    const mpChipCls  = {eBay:'mp-chip-ebay', CardMarket:'mp-chip-cardmkt'}[c.marketplace] || '';
+    const mpBorder   = {eBay:'#e53238', CardMarket:'#009e95'}[c.marketplace] || 'var(--border)';
+    const condClass  = {'PSA 10':'cond-psa10','PSA 9':'cond-psa9','Near Mint':'cond-nm','Lightly Played':'cond-lp','Moderately Played':'cond-mp'}[c.condition] || 'cond-nm';
 
     const savingHtml = score > 0
-      ? `<span class="price-saving"><i class="fa-solid fa-arrow-down"></i> save ${fmt(score)}</span>`
+      ? `<span class="price-saving"><i class="fa-solid fa-arrow-down"></i> save ${fmtPrice(score, c.currency)}</span>`
       : score < 0
-      ? `<span class="price-over"><i class="fa-solid fa-arrow-up"></i> ${fmt(Math.abs(score))} over</span>`
+      ? `<span class="price-over"><i class="fa-solid fa-arrow-up"></i> ${fmtPrice(Math.abs(score), c.currency)} over</span>`
       : '';
 
     // swap src to a real URL when eBay photos are connected
@@ -1135,7 +1144,7 @@
            <span class="card-thumb-label">Photo</span>
          </div>`;
 
-    return `<div class="listing-card">
+    return `<div class="listing-card" style="border-left-color:${mpBorder}">
       <div class="card-thumb">${thumbHtml}</div>
       <div class="card-body">
         <div class="listing-top">
@@ -1148,7 +1157,7 @@
         <div class="listing-meta">
           <div class="meta-item">
             <span class="meta-label">Marketplace</span>
-            <span class="meta-value marketplace-chip">
+            <span class="meta-value marketplace-chip ${mpChipCls}">
               <span class="mp-dot ${mpClass}"></span>${c.marketplace}
             </span>
           </div>
@@ -1158,8 +1167,8 @@
           </div>
         </div>
         <div class="price-row">
-          <span class="price-listing">${fmt(c.price)}</span>
-          <span class="price-market">mkt ${fmt(c.market)}</span>
+          <span class="price-listing">${fmtPrice(c.price, c.currency)}</span>
+          <span class="price-market">mkt ${fmtPrice(c.market, c.currency)}</span>
           ${savingHtml}
         </div>
         <div class="listing-actions">
@@ -1320,6 +1329,10 @@
 
   // ─── Utils ───────────────────────────────────────────────────────────────────
   function fmt(n) { return '£' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function fmtPrice(n, currency) {
+    const sym = (currency || 'GBP') === 'EUR' ? '€' : '£';
+    return sym + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
 
   function viewListing(idx) {
     const c = renderedResults[idx];
